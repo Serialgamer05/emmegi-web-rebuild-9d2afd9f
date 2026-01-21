@@ -3,53 +3,50 @@ import HomePage from "@/components/pages/HomePage";
 import SearchPage from "@/components/pages/SearchPage";
 import FavoritesPage from "@/components/pages/FavoritesPage";
 import SettingsPage from "@/components/settings/SettingsPage";
-import AuthPage from "@/components/auth/AuthPage";
+import LoginForm from "@/components/auth/LoginForm";
 import AdminDashboard from "@/components/admin/AdminDashboard";
-import { useAuth } from "@/hooks/useAuth";
 
 const Index = () => {
   const [currentPage, setCurrentPage] = useState("home");
-  const [showAuth, setShowAuth] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [adminTab, setAdminTab] = useState<"admin" | "macchine">("macchine");
 
-  const { user, isAdmin, signOut, isLoading } = useAuth();
+  const adminEmails = ["lucafinaldi3@gmail.com", "matviso03@gmail.com"];
+
+  const handleLogin = (email: string, password: string) => {
+    // Mock login - will be replaced with Supabase auth
+    setIsLoggedIn(true);
+    setShowLogin(false);
+    if (adminEmails.includes(email.toLowerCase())) {
+      setIsAdmin(true);
+    }
+    setCurrentPage("home");
+  };
 
   const handleNavigate = (page: string) => {
     if (page === "logout") {
-      signOut();
+      setIsLoggedIn(false);
+      setIsAdmin(false);
       setCurrentPage("home");
-      return;
-    }
-    if (page === "login") {
-      setShowAuth(true);
       return;
     }
     setCurrentPage(page);
   };
 
-  // Show loading while checking auth
-  if (isLoading) {
+  // Show login form
+  if (showLogin) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted-foreground">Caricamento...</div>
-      </div>
-    );
-  }
-
-  // Show auth page
-  if (showAuth) {
-    return (
-      <AuthPage
-        onBack={() => {
-          setShowAuth(false);
-          setCurrentPage("home");
-        }}
+      <LoginForm
+        onLogin={handleLogin}
+        onRegister={() => console.log("Register")}
       />
     );
   }
 
-  // Show admin dashboard (only if admin)
-  if ((currentPage === "admin" || currentPage === "add-product") && isAdmin) {
+  // Show admin dashboard
+  if (currentPage === "admin" || currentPage === "add-product") {
     return (
       <AdminDashboard
         currentTab={adminTab}
@@ -62,21 +59,15 @@ const Index = () => {
   // Regular pages
   switch (currentPage) {
     case "search":
-      return (
-        <SearchPage onNavigate={handleNavigate} currentPage={currentPage} />
-      );
+      return <SearchPage onNavigate={handleNavigate} currentPage={currentPage} />;
     case "favorites":
-      return (
-        <FavoritesPage onNavigate={handleNavigate} currentPage={currentPage} />
-      );
+      return <FavoritesPage onNavigate={handleNavigate} currentPage={currentPage} />;
     case "settings":
       return (
         <>
-          <SettingsPage
-            isLoggedIn={!!user}
-            onLogin={() => setShowAuth(true)}
-            userEmail={user?.email}
-            onLogout={() => signOut()}
+          <SettingsPage 
+            isLoggedIn={isLoggedIn} 
+            onLogin={() => setShowLogin(true)} 
           />
           <div className="fixed bottom-0 left-0 right-0">
             <nav className="bg-card border-t border-border">
@@ -91,9 +82,7 @@ const Index = () => {
                     key={item.id}
                     onClick={() => handleNavigate(item.id)}
                     className={`flex flex-col items-center gap-1 px-4 py-2 transition-colors ${
-                      currentPage === item.id
-                        ? "text-primary"
-                        : "text-muted-foreground"
+                      currentPage === item.id ? "text-primary" : "text-muted-foreground"
                     }`}
                   >
                     <span className="text-lg">{item.icon}</span>
@@ -107,9 +96,10 @@ const Index = () => {
       );
     default:
       return (
-        <HomePage
-          onNavigate={handleNavigate}
-          currentPage={currentPage}
+        <HomePage 
+          onNavigate={handleNavigate} 
+          currentPage={currentPage} 
+          isAdmin={isAdmin}
         />
       );
   }
