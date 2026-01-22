@@ -133,30 +133,36 @@ const SettingsPage = ({ isLoggedIn, onLogin, userEmail, onLogout }: SettingsPage
           </CardHeader>
           <CardContent className="space-y-4">
             <a
-              href="tel:+393924484032"
+              href="tel:+390444317185"
               className="flex items-center gap-3 text-foreground hover:text-primary transition-colors"
             >
               <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
                 <Phone className="h-5 w-5 text-primary" />
               </div>
-              <span>+39 392 448 4032</span>
+              <div>
+                <span className="block">+39 0444 317185</span>
+                <span className="text-sm text-muted-foreground">Tel. / Fax</span>
+              </div>
             </a>
 
             <a
-              href="mailto:lucafinaldi3@gmail.com"
+              href="mailto:info@emmegisrl.com"
               className="flex items-center gap-3 text-foreground hover:text-primary transition-colors"
             >
               <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
                 <Mail className="h-5 w-5 text-primary" />
               </div>
-              <span>lucafinaldi3@gmail.com</span>
+              <span>info@emmegisrl.com</span>
             </a>
 
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
                 <MapPin className="h-5 w-5 text-primary" />
               </div>
-              <span>Cavazzale (VI), Italia</span>
+              <div>
+                <span className="block">Via dell'Industria, 12</span>
+                <span className="text-sm text-muted-foreground">36010 Cavazzale di Monticello Conte Otto (VI)</span>
+              </div>
             </div>
           </CardContent>
         </Card>
