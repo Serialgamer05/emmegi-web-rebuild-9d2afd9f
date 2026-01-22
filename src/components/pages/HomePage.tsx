@@ -1,10 +1,10 @@
 import { useState, useRef } from "react";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
-import BottomNav from "@/components/layout/BottomNav";
 import ContactBar from "@/components/home/ContactBar";
-import HeroSection from "@/components/home/HeroSection";
+import SearchBar from "@/components/home/SearchBar";
 import ProductGrid from "@/components/home/ProductGrid";
+import ContactFooter from "@/components/home/ContactFooter";
 import { useMacchinari } from "@/hooks/useMacchinari";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -16,6 +16,7 @@ interface HomePageProps {
 const HomePage = ({ onNavigate, currentPage }: HomePageProps) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const productsRef = useRef<HTMLDivElement>(null);
   
   const { data: macchinari, isLoading } = useMacchinari();
@@ -27,16 +28,12 @@ const HomePage = ({ onNavigate, currentPage }: HomePageProps) => {
     );
   };
 
-  const handleScrollToProducts = () => {
-    productsRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   const handleProductClick = (product: { id: string; name: string }) => {
     console.log("Product clicked:", product);
     // TODO: Navigate to product detail
   };
 
-  // Transform macchinari to product format
+  // Transform macchinari to product format and filter by search
   const products = macchinari?.map((m) => ({
     id: m.id,
     name: m.nome,
@@ -44,8 +41,12 @@ const HomePage = ({ onNavigate, currentPage }: HomePageProps) => {
     imageUrl: m.foto_url || "/placeholder.svg",
   })) || [];
 
+  const filteredProducts = products.filter((p) =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background">
       <Header
         onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
         isMenuOpen={isSidebarOpen}
@@ -61,25 +62,42 @@ const HomePage = ({ onNavigate, currentPage }: HomePageProps) => {
 
       <main>
         <ContactBar />
-        <HeroSection onScrollToProducts={handleScrollToProducts} />
+        
+        {/* Search Bar replaces Hero Section */}
+        <div className="bg-gradient-to-b from-primary/5 to-background">
+          <div className="text-center pt-6 pb-2">
+            <h2 className="text-2xl font-bold">
+              Macchinari <span className="text-primary">Industriali</span>
+            </h2>
+          </div>
+          <SearchBar 
+            value={searchQuery} 
+            onChange={setSearchQuery} 
+            placeholder="Cerca macchinario..."
+          />
+        </div>
 
         <div ref={productsRef}>
           {isLoading ? (
             <div className="p-6 text-center text-muted-foreground">
               Caricamento macchinari...
             </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="p-6 text-center text-muted-foreground">
+              {searchQuery ? "Nessun macchinario trovato." : "Nessun macchinario disponibile."}
+            </div>
           ) : (
             <ProductGrid
-              products={products}
+              products={filteredProducts}
               favorites={favorites}
               onToggleFavorite={handleToggleFavorite}
               onProductClick={handleProductClick}
             />
           )}
         </div>
-      </main>
 
-      <BottomNav currentPage={currentPage} onNavigate={onNavigate} />
+        <ContactFooter />
+      </main>
     </div>
   );
 };

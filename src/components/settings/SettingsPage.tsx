@@ -1,53 +1,89 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import { Settings as SettingsIcon, Moon, Sun, LogOut, LogIn, Mail, Phone, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Phone, Mail, MapPin, LogOut, User } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Header from "@/components/layout/Header";
+import Sidebar from "@/components/layout/Sidebar";
+import { useAuth } from "@/hooks/useAuth";
 
 interface SettingsPageProps {
   isLoggedIn: boolean;
   onLogin: () => void;
   userEmail?: string;
-  onLogout?: () => void;
+  onLogout: () => void;
 }
 
 const SettingsPage = ({ isLoggedIn, onLogin, userEmail, onLogout }: SettingsPageProps) => {
+  const [isDarkMode, setIsDarkMode] = useState(
+    document.documentElement.classList.contains("dark")
+  );
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { isAdmin } = useAuth();
+
+  const toggleDarkMode = () => {
+    document.documentElement.classList.toggle("dark");
+    setIsDarkMode(!isDarkMode);
+  };
+
+  const handleNavigate = (page: string) => {
+    if (page === "logout") {
+      onLogout();
+    } else if (page === "login") {
+      onLogin();
+    }
+    setIsSidebarOpen(false);
+  };
+
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
-      <header className="bg-card border-b border-border p-4 text-center">
-        <h1 className="text-xl font-semibold">Impostazioni</h1>
-      </header>
+    <div className="min-h-screen bg-background">
+      <Header
+        onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+        isMenuOpen={isSidebarOpen}
+      />
+
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        currentPage="settings"
+        onNavigate={handleNavigate}
+        isAdmin={isAdmin}
+      />
 
       <main className="p-4 space-y-4">
+        <div className="flex items-center gap-2 mb-6">
+          <SettingsIcon className="h-5 w-5 text-primary" />
+          <h1 className="text-xl font-semibold">Impostazioni</h1>
+        </div>
+
         {/* Account section */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Account
-            </CardTitle>
+            <CardTitle className="text-lg">Account</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoggedIn ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                    <User className="h-6 w-6 text-primary" />
+                    <span className="text-primary font-bold text-lg">
+                      {userEmail?.charAt(0).toUpperCase()}
+                    </span>
                   </div>
                   <div>
-                    <p className="font-medium">{userEmail || "Utente"}</p>
+                    <p className="font-medium">{userEmail}</p>
                     <p className="text-sm text-muted-foreground">Account attivo</p>
                   </div>
                 </div>
-                {onLogout && (
-                  <Button
-                    variant="outline"
-                    className="w-full rounded-xl"
-                    onClick={onLogout}
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Esci
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  className="w-full rounded-xl"
+                  onClick={onLogout}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Esci
+                </Button>
               </div>
             ) : (
               <div className="space-y-3">
@@ -55,12 +91,40 @@ const SettingsPage = ({ isLoggedIn, onLogin, userEmail, onLogout }: SettingsPage
                   Accedi per gestire i tuoi preferiti e molto altro.
                 </p>
                 <Button className="w-full rounded-xl" onClick={onLogin}>
-                  Accedi o Registrati
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Accedi
                 </Button>
               </div>
             )}
           </CardContent>
         </Card>
+
+        {/* Theme Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Aspetto</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {isDarkMode ? (
+                  <Moon className="h-5 w-5 text-muted-foreground" />
+                ) : (
+                  <Sun className="h-5 w-5 text-muted-foreground" />
+                )}
+                <div>
+                  <p className="font-medium">Modalità Scura</p>
+                  <p className="text-sm text-muted-foreground">
+                    {isDarkMode ? "Attiva" : "Disattiva"}
+                  </p>
+                </div>
+              </div>
+              <Switch checked={isDarkMode} onCheckedChange={toggleDarkMode} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Separator />
 
         {/* Company info */}
         <Card>

@@ -193,6 +193,39 @@ export type Database = {
         }
         Relationships: []
       }
+      products: {
+        Row: {
+          admin_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          image_urls: string[]
+          name: string
+          price: number
+          status: string | null
+        }
+        Insert: {
+          admin_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_urls: string[]
+          name: string
+          price: number
+          status?: string | null
+        }
+        Update: {
+          admin_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_urls?: string[]
+          name?: string
+          price?: number
+          status?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           id: string

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import HomePage from "@/components/pages/HomePage";
-import SearchPage from "@/components/pages/SearchPage";
 import FavoritesPage from "@/components/pages/FavoritesPage";
 import SettingsPage from "@/components/settings/SettingsPage";
 import AuthPage from "@/components/auth/AuthPage";
@@ -61,49 +60,18 @@ const Index = () => {
 
   // Regular pages
   switch (currentPage) {
-    case "search":
-      return (
-        <SearchPage onNavigate={handleNavigate} currentPage={currentPage} />
-      );
     case "favorites":
       return (
         <FavoritesPage onNavigate={handleNavigate} currentPage={currentPage} />
       );
     case "settings":
       return (
-        <>
-          <SettingsPage
-            isLoggedIn={!!user}
-            onLogin={() => setShowAuth(true)}
-            userEmail={user?.email}
-            onLogout={() => signOut()}
-          />
-          <div className="fixed bottom-0 left-0 right-0">
-            <nav className="bg-card border-t border-border">
-              <div className="flex items-center justify-around py-2">
-                {[
-                  { id: "home", label: "Home", icon: "🏠" },
-                  { id: "search", label: "Cerca", icon: "🔍" },
-                  { id: "favorites", label: "Preferiti", icon: "❤️" },
-                  { id: "settings", label: "Impostazioni", icon: "⚙️" },
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => handleNavigate(item.id)}
-                    className={`flex flex-col items-center gap-1 px-4 py-2 transition-colors ${
-                      currentPage === item.id
-                        ? "text-primary"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    <span className="text-lg">{item.icon}</span>
-                    <span className="text-xs font-medium">{item.label}</span>
-                  </button>
-                ))}
-              </div>
-            </nav>
-          </div>
-        </>
+        <SettingsPage
+          isLoggedIn={!!user}
+          onLogin={() => setShowAuth(true)}
+          userEmail={user?.email}
+          onLogout={() => signOut()}
+        />
       );
     default:
       return (
