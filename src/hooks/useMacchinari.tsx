@@ -62,6 +62,45 @@ export const useAddMacchinario = () => {
   });
 };
 
+export const useUpdateMacchinario = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (macchinario: {
+      id: string;
+      nome: string;
+      descrizione?: string | null;
+      prezzo?: number | null;
+      foto_url?: string | null;
+    }) => {
+      const { data, error } = await supabase
+        .from("macchinari")
+        .update({
+          nome: macchinario.nome,
+          descrizione: macchinario.descrizione,
+          prezzo: macchinario.prezzo,
+          foto_url: macchinario.foto_url,
+        })
+        .eq("id", macchinario.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["macchinari"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Errore",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+};
+
 export const useDeleteMacchinario = () => {
   const queryClient = useQueryClient();
 
