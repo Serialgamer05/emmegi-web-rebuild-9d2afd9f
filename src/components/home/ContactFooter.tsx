@@ -39,7 +39,7 @@ const ContactFooter = () => {
           </a>
           
           <a 
-            href="mailto:info@emmegisrl.com" 
+            href="mailto:Venturi2005@libero.it" 
             className="flex items-center gap-4 p-4 bg-muted rounded-xl hover:bg-muted/80 transition-colors"
           >
             <div className="bg-primary p-3 rounded-full">
@@ -47,7 +47,7 @@ const ContactFooter = () => {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Email</p>
-              <p className="font-semibold">info@emmegisrl.com</p>
+              <p className="font-semibold">Venturi2005@libero.it</p>
             </div>
           </a>
           
