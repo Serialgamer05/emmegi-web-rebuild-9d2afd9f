@@ -5,40 +5,45 @@ import ContactBar from "@/components/home/ContactBar";
 import SearchBar from "@/components/home/SearchBar";
 import ProductGrid from "@/components/home/ProductGrid";
 import ContactFooter from "@/components/home/ContactFooter";
-import { useMacchinari, Macchinario } from "@/hooks/useMacchinari";
+import { useMacchinari } from "@/hooks/useMacchinari";
 import { useAuth } from "@/hooks/useAuth";
 
 interface HomePageProps {
   onNavigate: (page: string) => void;
   currentPage: string;
-  onProductClick: (product: Macchinario) => void;
 }
 
-const HomePage = ({ onNavigate, currentPage, onProductClick }: HomePageProps) => {
+const HomePage = ({ onNavigate, currentPage }: HomePageProps) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const productsRef = useRef<HTMLDivElement>(null);
   
   const { data: macchinari, isLoading } = useMacchinari();
   const { isAdmin } = useAuth();
 
+  const handleToggleFavorite = (id: string) => {
+    setFavorites((prev) =>
+      prev.includes(id) ? prev.filter((fid) => fid !== id) : [...prev, id]
+    );
+  };
+
+  const handleProductClick = (product: { id: string; name: string }) => {
+    console.log("Product clicked:", product);
+    // TODO: Navigate to product detail
+  };
+
   // Transform macchinari to product format and filter by search
   const products = macchinari?.map((m) => ({
     id: m.id,
     name: m.nome,
+    price: m.prezzo || 0,
     imageUrl: m.foto_url || "/placeholder.svg",
   })) || [];
 
   const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const handleProductClick = (product: { id: string; name: string; imageUrl: string }) => {
-    const fullProduct = macchinari?.find(m => m.id === product.id);
-    if (fullProduct) {
-      onProductClick(fullProduct);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -84,6 +89,8 @@ const HomePage = ({ onNavigate, currentPage, onProductClick }: HomePageProps) =>
           ) : (
             <ProductGrid
               products={filteredProducts}
+              favorites={favorites}
+              onToggleFavorite={handleToggleFavorite}
               onProductClick={handleProductClick}
             />
           )}

@@ -407,17 +407,10 @@ const AdminDashboard = ({ currentTab, onTabChange, onExit }: AdminDashboardProps
                   <li className="flex items-center gap-2 p-2 bg-primary/10 rounded-lg">
                     <span className="w-2 h-2 bg-primary rounded-full" />
                     <span className="text-primary font-medium">lucafinaldi3@gmail.com</span>
-                    <span className="text-xs text-muted-foreground ml-auto">(fisso)</span>
                   </li>
                   <li className="flex items-center gap-2 p-2 bg-primary/10 rounded-lg">
                     <span className="w-2 h-2 bg-primary rounded-full" />
                     <span className="text-primary font-medium">matviso03@gmail.com</span>
-                    <span className="text-xs text-muted-foreground ml-auto">(fisso)</span>
-                  </li>
-                  <li className="flex items-center gap-2 p-2 bg-primary/10 rounded-lg">
-                    <span className="w-2 h-2 bg-primary rounded-full" />
-                    <span className="text-primary font-medium">Venturi2005@libero.it</span>
-                    <span className="text-xs text-muted-foreground ml-auto">(fisso)</span>
                   </li>
                 </ul>
               </CardContent>
@@ -448,6 +441,12 @@ const AdminDashboard = ({ currentTab, onTabChange, onExit }: AdminDashboardProps
             }`}
           >
             Macchine
+          </button>
+          <button
+            onClick={onExit}
+            className="flex-1 py-4 text-center font-medium text-muted-foreground"
+          >
+            Esci
           </button>
         </div>
       </nav>
