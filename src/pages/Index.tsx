@@ -1,29 +1,77 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 import HomePage from "@/components/pages/HomePage";
-import FavoritesPage from "@/components/pages/FavoritesPage";
 import SettingsPage from "@/components/settings/SettingsPage";
 import AuthPage from "@/components/auth/AuthPage";
 import AdminDashboard from "@/components/admin/AdminDashboard";
+import ProductDetailPage from "@/components/product/ProductDetailPage";
 import { useAuth } from "@/hooks/useAuth";
+import { useMacchinari, Macchinario } from "@/hooks/useMacchinari";
 
 const Index = () => {
   const [currentPage, setCurrentPage] = useState("home");
   const [showAuth, setShowAuth] = useState(false);
   const [adminTab, setAdminTab] = useState<"admin" | "macchine">("macchine");
+  const [selectedProduct, setSelectedProduct] = useState<Macchinario | null>(null);
 
   const { user, isAdmin, signOut, isLoading } = useAuth();
+  const { data: macchinari } = useMacchinari();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Handle URL-based product routing
+  useEffect(() => {
+    const path = location.pathname;
+    if (path !== "/" && macchinari) {
+      const productSlug = path.slice(1); // Remove leading /
+      const product = macchinari.find(
+        (m) => slugify(m.nome) === productSlug
+      );
+      if (product) {
+        setSelectedProduct(product);
+        setCurrentPage("product");
+      }
+    }
+  }, [location.pathname, macchinari]);
+
+  const slugify = (text: string) => {
+    return text
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/--+/g, '-')
+      .trim();
+  };
 
   const handleNavigate = (page: string) => {
     if (page === "logout") {
       signOut();
       setCurrentPage("home");
+      setSelectedProduct(null);
+      navigate("/");
       return;
     }
     if (page === "login") {
       setShowAuth(true);
       return;
     }
+    if (page === "home") {
+      setSelectedProduct(null);
+      navigate("/");
+    }
     setCurrentPage(page);
+  };
+
+  const handleProductClick = (product: Macchinario) => {
+    setSelectedProduct(product);
+    setCurrentPage("product");
+    navigate(`/${slugify(product.nome)}`);
+  };
+
+  const handleBackFromProduct = () => {
+    setSelectedProduct(null);
+    setCurrentPage("home");
+    navigate("/");
   };
 
   // Show loading while checking auth
@@ -47,23 +95,30 @@ const Index = () => {
     );
   }
 
+  // Show product detail
+  if (currentPage === "product" && selectedProduct) {
+    return (
+      <ProductDetailPage
+        product={selectedProduct}
+        onBack={handleBackFromProduct}
+        onProductClick={handleProductClick}
+      />
+    );
+  }
+
   // Show admin dashboard (only if admin)
   if ((currentPage === "admin" || currentPage === "add-product") && isAdmin) {
     return (
       <AdminDashboard
         currentTab={adminTab}
         onTabChange={setAdminTab}
-        onExit={() => setCurrentPage("home")}
+        onExit={() => handleNavigate("home")}
       />
     );
   }
 
   // Regular pages
   switch (currentPage) {
-    case "favorites":
-      return (
-        <FavoritesPage onNavigate={handleNavigate} currentPage={currentPage} />
-      );
     case "settings":
       return (
         <SettingsPage
@@ -71,6 +126,7 @@ const Index = () => {
           onLogin={() => setShowAuth(true)}
           userEmail={user?.email}
           onLogout={() => signOut()}
+          onNavigate={handleNavigate}
         />
       );
     default:
@@ -78,6 +134,7 @@ const Index = () => {
         <HomePage
           onNavigate={handleNavigate}
           currentPage={currentPage}
+          onProductClick={handleProductClick}
         />
       );
   }

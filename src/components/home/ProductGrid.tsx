@@ -3,18 +3,15 @@ import ProductCard from "./ProductCard";
 interface Product {
   id: string;
   name: string;
-  price: number;
   imageUrl: string;
 }
 
 interface ProductGridProps {
   products: Product[];
-  favorites: string[];
-  onToggleFavorite: (id: string) => void;
   onProductClick: (product: Product) => void;
 }
 
-const ProductGrid = ({ products, favorites, onToggleFavorite, onProductClick }: ProductGridProps) => {
+const ProductGrid = ({ products, onProductClick }: ProductGridProps) => {
   if (products.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
@@ -29,8 +26,6 @@ const ProductGrid = ({ products, favorites, onToggleFavorite, onProductClick }: 
         <ProductCard
           key={product.id}
           {...product}
-          isFavorite={favorites.includes(product.id)}
-          onToggleFavorite={onToggleFavorite}
           onClick={() => onProductClick(product)}
         />
       ))}
