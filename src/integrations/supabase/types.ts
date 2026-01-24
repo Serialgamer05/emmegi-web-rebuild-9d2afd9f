@@ -323,6 +323,7 @@ export type Database = {
           id: string
           is_verified: boolean | null
           otp_code: string | null
+          otp_type: string | null
         }
         Insert: {
           created_at?: string | null
@@ -330,6 +331,7 @@ export type Database = {
           id?: string
           is_verified?: boolean | null
           otp_code?: string | null
+          otp_type?: string | null
         }
         Update: {
           created_at?: string | null
@@ -337,6 +339,7 @@ export type Database = {
           id?: string
           is_verified?: boolean | null
           otp_code?: string | null
+          otp_type?: string | null
         }
         Relationships: []
       }

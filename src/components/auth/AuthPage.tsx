@@ -8,6 +8,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { ArrowLeft, Mail, Lock, Shield, ChevronRight } from "lucide-react";
 
 const emailSchema = z.string().email("Email non valida");
 const passwordSchema = z.string()
@@ -15,24 +17,25 @@ const passwordSchema = z.string()
   .max(10, "La password deve avere massimo 10 caratteri")
   .regex(/^[a-zA-Z0-9]+$/, "La password deve contenere solo lettere e numeri");
 
-// Admin emails that bypass Google auth
-const ADMIN_EMAILS = ["lucafinaldi3@gmail.com", "matviso03@gmail.com"];
-const ADMIN_PASSWORD = "admin26";
+// Admin emails that require password login
+const ADMIN_EMAILS = ["lucafinaldi3@gmail.com", "matviso03@gmail.com", "venturi2005@libero.it"];
 
 interface AuthPageProps {
   onBack?: () => void;
 }
 
 const AuthPage = ({ onBack }: AuthPageProps) => {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [loginAttempts, setLoginAttempts] = useState(0);
   const [showResetPassword, setShowResetPassword] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const [showOtpVerification, setShowOtpVerification] = useState(false);
+  const [otpValue, setOtpValue] = useState("");
+  const [resetType, setResetType] = useState<"password_reset" | "verification">("password_reset");
+  const { signIn } = useAuth();
 
-  const isAdminEmail = ADMIN_EMAILS.includes(email.toLowerCase());
+  const isAdminEmail = ADMIN_EMAILS.map(e => e.toLowerCase()).includes(email.toLowerCase());
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
@@ -50,7 +53,7 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
           variant: "destructive",
         });
       }
-    } catch (error: any) {
+    } catch {
       toast({
         title: "Errore",
         description: "Impossibile accedere con Google",
@@ -93,6 +96,7 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
         
         if (newAttempts >= 2) {
           setShowResetPassword(true);
+          setResetType("password_reset");
           toast({
             title: "Troppi tentativi falliti",
             description: "Puoi resettare la password se l'hai dimenticata.",
@@ -117,7 +121,7 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
     }
   };
 
-  const handleResetPassword = async () => {
+  const handleSendOtp = async () => {
     if (!email) {
       toast({
         title: "Errore",
@@ -129,21 +133,24 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'https://emmegi-web-rebuild.vercel.app/',
+      const response = await supabase.functions.invoke('send-otp', {
+        body: { 
+          email: email.toLowerCase(),
+          type: resetType
+        }
       });
-      if (error) throw error;
-      
+
+      if (response.error) throw response.error;
+
       toast({
-        title: "Email inviata",
-        description: "Controlla la tua email per resettare la password.",
+        title: "Codice inviato",
+        description: "Controlla la tua email per il codice OTP.",
       });
-      setShowResetPassword(false);
-      setLoginAttempts(0);
+      setShowOtpVerification(true);
     } catch (error: any) {
       toast({
         title: "Errore",
-        description: error.message || "Impossibile inviare l'email di reset.",
+        description: error.message || "Impossibile inviare il codice OTP.",
         variant: "destructive",
       });
     } finally {
@@ -151,110 +158,266 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
     }
   };
 
-  // Admin login form
-  if (isAdminEmail || (email && ADMIN_EMAILS.some(ae => email.toLowerCase().startsWith(ae.split('@')[0])))) {
+  const handleVerifyOtp = async () => {
+    if (otpValue.length !== 6) {
+      toast({
+        title: "Errore",
+        description: "Inserisci il codice completo a 6 cifre.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await supabase.functions.invoke('verify-otp', {
+        body: { 
+          email: email.toLowerCase(),
+          otp: otpValue,
+          type: resetType
+        }
+      });
+
+      if (response.error || !response.data?.success) {
+        throw new Error(response.data?.error || "Verifica fallita");
+      }
+
+      toast({
+        title: "Verifica completata",
+        description: "Ora puoi reimpostare la tua password.",
+      });
+      
+      // Reset to login with new password
+      setShowOtpVerification(false);
+      setShowResetPassword(false);
+      setOtpValue("");
+      setLoginAttempts(0);
+      
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: error.message || "Codice OTP non valido.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // OTP Verification Screen
+  if (showOtpVerification) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center space-y-2">
-            <div className="w-16 h-16 bg-primary text-primary-foreground rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-lg">
-              E
+        <Card className="w-full max-w-md rounded-3xl shadow-xl border-0 bg-card">
+          <CardHeader className="text-center space-y-3 pb-2">
+            <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-2xl flex items-center justify-center mx-auto shadow-lg">
+              <Shield className="h-8 w-8" />
             </div>
-            <h1 className="text-2xl font-bold">Accesso Amministratore</h1>
-            <p className="text-muted-foreground">
-              Inserisci le tue credenziali admin
+            <h1 className="text-2xl font-semibold tracking-tight">Verifica OTP</h1>
+            <p className="text-muted-foreground text-sm">
+              Inserisci il codice a 6 cifre inviato a<br />
+              <span className="font-medium text-foreground">{email}</span>
             </p>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {showResetPassword ? (
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground text-center">
-                  Inserisci la tua email per ricevere il link di reset password.
-                </p>
-                <div className="space-y-2">
-                  <Label htmlFor="reset-email">Email</Label>
-                  <Input
-                    id="reset-email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="rounded-xl"
-                    disabled={isLoading}
-                  />
-                </div>
-                <Button
-                  className="w-full rounded-xl"
-                  onClick={handleResetPassword}
+          <CardContent className="space-y-6 pt-4">
+            <div className="flex justify-center">
+              <InputOTP
+                value={otpValue}
+                onChange={setOtpValue}
+                maxLength={6}
+              >
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} className="rounded-xl" />
+                  <InputOTPSlot index={1} className="rounded-xl" />
+                  <InputOTPSlot index={2} className="rounded-xl" />
+                  <InputOTPSlot index={3} className="rounded-xl" />
+                  <InputOTPSlot index={4} className="rounded-xl" />
+                  <InputOTPSlot index={5} className="rounded-xl" />
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
+
+            <Button
+              className="w-full rounded-2xl py-6 font-medium"
+              onClick={handleVerifyOtp}
+              disabled={isLoading || otpValue.length !== 6}
+            >
+              {isLoading ? "Verifica..." : "Verifica Codice"}
+            </Button>
+
+            <div className="text-center">
+              <button
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                onClick={handleSendOtp}
+                disabled={isLoading}
+              >
+                Non hai ricevuto il codice? <span className="text-primary font-medium">Rinvia</span>
+              </button>
+            </div>
+
+            <Button
+              variant="ghost"
+              className="w-full rounded-2xl"
+              onClick={() => {
+                setShowOtpVerification(false);
+                setOtpValue("");
+              }}
+              disabled={isLoading}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Torna indietro
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Reset Password Screen
+  if (showResetPassword) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        <Card className="w-full max-w-md rounded-3xl shadow-xl border-0 bg-card">
+          <CardHeader className="text-center space-y-3 pb-2">
+            <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-2xl flex items-center justify-center mx-auto shadow-lg">
+              <Mail className="h-8 w-8" />
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight">Reset Password</h1>
+            <p className="text-muted-foreground text-sm">
+              Ti invieremo un codice di verifica via email
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-6 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="reset-email" className="text-sm font-medium">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  id="reset-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="rounded-2xl pl-12 py-6"
+                  placeholder="La tua email"
                   disabled={isLoading}
-                >
-                  {isLoading ? "Invio..." : "Invia Link Reset"}
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full"
-                  onClick={() => {
-                    setShowResetPassword(false);
-                    setLoginAttempts(0);
-                  }}
-                >
-                  Torna al login
-                </Button>
+                />
               </div>
-            ) : (
-              <form onSubmit={handleAdminLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+            </div>
+
+            <Button
+              className="w-full rounded-2xl py-6 font-medium"
+              onClick={handleSendOtp}
+              disabled={isLoading}
+            >
+              {isLoading ? "Invio..." : "Invia Codice OTP"}
+              <ChevronRight className="h-5 w-5 ml-2" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              className="w-full rounded-2xl"
+              onClick={() => {
+                setShowResetPassword(false);
+                setLoginAttempts(0);
+              }}
+              disabled={isLoading}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Torna al login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Admin login form
+  if (isAdminEmail) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        <Card className="w-full max-w-md rounded-3xl shadow-xl border-0 bg-card">
+          <CardHeader className="text-center space-y-3 pb-2">
+            <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-lg">
+              E
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight">Accesso Admin</h1>
+            <p className="text-muted-foreground text-sm">
+              Inserisci le tue credenziali
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-6 pt-4">
+            <form onSubmit={handleAdminLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
                     id="email"
                     type="email"
-                    placeholder="admin@esempio.it"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="rounded-xl"
+                    className="rounded-2xl pl-12 py-6"
                     disabled={isLoading}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
                     id="password"
                     type="password"
                     placeholder="• • • • • •"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="rounded-xl"
+                    className="rounded-2xl pl-12 py-6"
                     disabled={isLoading}
                   />
                 </div>
-                <Button
-                  type="submit"
-                  className="w-full rounded-xl py-6"
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Caricamento..." : "Accedi come Admin"}
-                </Button>
-              </form>
-            )}
+              </div>
+              <Button
+                type="submit"
+                className="w-full rounded-2xl py-6 font-medium"
+                disabled={isLoading}
+              >
+                {isLoading ? "Caricamento..." : "Accedi"}
+                <ChevronRight className="h-5 w-5 ml-2" />
+              </Button>
+            </form>
+
+            <div className="text-center">
+              <button
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => {
+                  setShowResetPassword(true);
+                  setResetType("password_reset");
+                }}
+              >
+                Password dimenticata? <span className="text-primary font-medium">Reimposta</span>
+              </button>
+            </div>
 
             <Separator />
 
             <Button
               variant="ghost"
-              className="w-full"
+              className="w-full rounded-2xl"
               onClick={() => setEmail("")}
               disabled={isLoading}
             >
-              ← Non sei admin? Accedi con Google
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Non sei admin? Accedi con Google
             </Button>
 
             {onBack && (
               <Button
                 variant="ghost"
-                className="w-full"
+                className="w-full rounded-2xl text-muted-foreground"
                 onClick={onBack}
                 disabled={isLoading}
               >
-                ← Torna alla Home
+                Torna alla Home
               </Button>
             )}
           </CardContent>
@@ -263,45 +426,45 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
     );
   }
 
-  // Regular user login with Google
+  // Regular user login with Google - iOS style
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center space-y-2">
-          <div className="w-16 h-16 bg-primary text-primary-foreground rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-lg">
+      <Card className="w-full max-w-md rounded-3xl shadow-xl border-0 bg-card">
+        <CardHeader className="text-center space-y-3 pb-2">
+          <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-lg">
             E
           </div>
-          <h1 className="text-2xl font-bold">Accedi</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight">Accedi</h1>
+          <p className="text-muted-foreground text-sm">
             Bentornato su Emmegi S.r.l.
           </p>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Google Sign In */}
+        <CardContent className="space-y-6 pt-4">
+          {/* Google Sign In - iOS style */}
           <Button
-            className="w-full rounded-xl py-6 flex items-center justify-center gap-3"
+            className="w-full rounded-2xl py-6 flex items-center justify-center gap-3 bg-card border-2 border-border text-foreground hover:bg-muted"
             onClick={handleGoogleSignIn}
             disabled={isLoading}
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
-                fill="currentColor"
+                fill="#4285F4"
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
               />
               <path
-                fill="currentColor"
+                fill="#34A853"
                 d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
               />
               <path
-                fill="currentColor"
+                fill="#FBBC05"
                 d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
               />
               <path
-                fill="currentColor"
+                fill="#EA4335"
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-            {isLoading ? "Caricamento..." : "Continua con Google"}
+            <span className="font-medium">{isLoading ? "Caricamento..." : "Continua con Google"}</span>
           </Button>
 
           <div className="relative">
@@ -309,35 +472,37 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
               <Separator className="w-full" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">oppure</span>
+              <span className="bg-card px-3 text-muted-foreground">oppure</span>
             </div>
           </div>
 
-          {/* Admin login option */}
-          <div className="space-y-2">
-            <Label htmlFor="admin-email">Email (solo admin)</Label>
-            <Input
-              id="admin-email"
-              type="email"
-              placeholder="admin@esempio.it"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="rounded-xl"
-              disabled={isLoading}
-            />
-            <p className="text-xs text-muted-foreground">
-              Inserisci l'email admin per accedere con password
+          {/* Admin login hint */}
+          <div className="space-y-3">
+            <p className="text-xs text-center text-muted-foreground">
+              Sei un amministratore? Inserisci la tua email admin
             </p>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                type="email"
+                placeholder="Email admin"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="rounded-2xl pl-12 py-6"
+                disabled={isLoading}
+              />
+            </div>
           </div>
 
           {onBack && (
             <Button
               variant="ghost"
-              className="w-full"
+              className="w-full rounded-2xl text-muted-foreground"
               onClick={onBack}
               disabled={isLoading}
             >
-              ← Torna alla Home
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Torna alla Home
             </Button>
           )}
         </CardContent>

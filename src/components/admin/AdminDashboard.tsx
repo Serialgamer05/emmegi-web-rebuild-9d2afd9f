@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useAddMacchinario, useMacchinari, useDeleteMacchinario, useUpdateMacchinario } from "@/hooks/useMacchinari";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Trash2, Upload, ArrowLeft, Pencil, UserPlus, Send } from "lucide-react";
+import { Trash2, Upload, ArrowLeft, Pencil, UserPlus, Send, Package, Users, Shield } from "lucide-react";
 import { Label } from "@/components/ui/label";
 
 interface AdminDashboardProps {
@@ -181,23 +181,19 @@ const AdminDashboard = ({ currentTab, onTabChange, onExit }: AdminDashboardProps
     setIsSendingInvite(true);
 
     try {
-      // Generate 6-digit OTP code
-      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-      
-      // Store in user_sessions table
-      const { error } = await supabase
-        .from("user_sessions")
-        .insert({
-          email: inviteEmail.trim(),
-          otp_code: otpCode,
-          is_verified: false,
-        });
+      // Send OTP via edge function
+      const response = await supabase.functions.invoke('send-otp', {
+        body: { 
+          email: inviteEmail.trim().toLowerCase(),
+          type: "admin_invite"
+        }
+      });
 
-      if (error) throw error;
+      if (response.error) throw response.error;
 
       toast({
         title: "Invito inviato",
-        description: `Codice OTP generato: ${otpCode} - Condividilo con ${inviteEmail}`,
+        description: `Codice OTP inviato a ${inviteEmail}. L'utente dovrà inserirlo per confermare.`,
       });
 
       setInviteEmail("");
@@ -205,7 +201,7 @@ const AdminDashboard = ({ currentTab, onTabChange, onExit }: AdminDashboardProps
       console.error("Error sending invite:", error);
       toast({
         title: "Errore",
-        description: "Impossibile inviare l'invito",
+        description: "Impossibile inviare l'invito. Verifica la configurazione email.",
         variant: "destructive",
       });
     } finally {
@@ -215,13 +211,14 @@ const AdminDashboard = ({ currentTab, onTabChange, onExit }: AdminDashboardProps
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-card border-b border-border p-4 flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={onExit}>
+      {/* Header - iOS style */}
+      <header className="bg-card/80 backdrop-blur-lg border-b border-border p-4 flex items-center gap-4 sticky top-0 z-10">
+        <Button variant="ghost" size="icon" onClick={onExit} className="rounded-full">
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <h1 className="text-xl font-semibold flex-1">
-          Dashboard Admin <span className="text-2xl">⚙️</span>
+        <h1 className="text-xl font-semibold flex-1 flex items-center gap-2">
+          Dashboard Admin
+          <Shield className="h-5 w-5 text-primary" />
         </h1>
       </header>
 
@@ -230,10 +227,10 @@ const AdminDashboard = ({ currentTab, onTabChange, onExit }: AdminDashboardProps
         {currentTab === "macchine" && (
           <>
             {/* Add new product form */}
-            <Card className="shadow-lg">
+            <Card className="shadow-lg rounded-3xl border-0 bg-card">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <Upload className="h-5 w-5" />
+                  <Upload className="h-5 w-5 text-primary" />
                   Aggiungi Macchinario
                 </CardTitle>
               </CardHeader>
@@ -244,14 +241,14 @@ const AdminDashboard = ({ currentTab, onTabChange, onExit }: AdminDashboardProps
                     type="file"
                     accept="image/*"
                     onChange={handleFileChange}
-                    className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                    className="w-full text-sm file:mr-4 file:py-2.5 file:px-5 file:rounded-2xl file:border-0 file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 file:font-medium"
                     disabled={isUploading}
                   />
                   {imagePreview && (
                     <img
                       src={imagePreview}
                       alt="Preview"
-                      className="w-full h-48 object-cover rounded-xl"
+                      className="w-full h-48 object-cover rounded-2xl"
                     />
                   )}
                 </div>
@@ -260,7 +257,7 @@ const AdminDashboard = ({ currentTab, onTabChange, onExit }: AdminDashboardProps
                   placeholder="Nome macchinario *"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
-                  className="bg-secondary/50 rounded-xl"
+                  className="bg-muted/50 rounded-2xl py-6"
                   disabled={isUploading}
                 />
                 
@@ -269,7 +266,7 @@ const AdminDashboard = ({ currentTab, onTabChange, onExit }: AdminDashboardProps
                   type="number"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
-                  className="bg-secondary/50 rounded-xl"
+                  className="bg-muted/50 rounded-2xl py-6"
                   disabled={isUploading}
                 />
                 
@@ -277,14 +274,14 @@ const AdminDashboard = ({ currentTab, onTabChange, onExit }: AdminDashboardProps
                   placeholder="Descrizione"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="bg-secondary/50 min-h-24 rounded-xl"
+                  className="bg-muted/50 min-h-24 rounded-2xl"
                   disabled={isUploading}
                 />
                 
                 <Button
                   onClick={handlePublish}
                   disabled={isUploading || addMacchinario.isPending}
-                  className="w-full bg-success hover:bg-success/90 text-success-foreground rounded-full py-6"
+                  className="w-full bg-primary hover:bg-primary/90 rounded-full py-6 font-medium"
                 >
                   {isUploading ? "Caricamento..." : "Pubblica"}
                 </Button>
@@ -292,9 +289,10 @@ const AdminDashboard = ({ currentTab, onTabChange, onExit }: AdminDashboardProps
             </Card>
 
             {/* Existing products list */}
-            <Card className="shadow-lg">
+            <Card className="shadow-lg rounded-3xl border-0 bg-card">
               <CardHeader>
-                <CardTitle className="text-lg">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Package className="h-5 w-5 text-primary" />
                   Macchinari Pubblicati ({macchinari?.length || 0})
                 </CardTitle>
               </CardHeader>
@@ -308,13 +306,13 @@ const AdminDashboard = ({ currentTab, onTabChange, onExit }: AdminDashboardProps
                     {macchinari?.map((m) => (
                       <div
                         key={m.id}
-                        className="flex items-center gap-3 p-3 bg-secondary/30 rounded-xl"
+                        className="flex items-center gap-3 p-3 bg-muted/30 rounded-2xl"
                       >
                         {m.foto_url && (
                           <img
                             src={m.foto_url}
                             alt={m.nome}
-                            className="w-16 h-16 object-cover rounded-lg"
+                            className="w-16 h-16 object-cover rounded-xl"
                           />
                         )}
                         <div className="flex-1 min-w-0">
@@ -336,7 +334,7 @@ const AdminDashboard = ({ currentTab, onTabChange, onExit }: AdminDashboardProps
                               descrizione: m.descrizione,
                               foto_url: m.foto_url,
                             })}
-                            className="text-primary hover:text-primary"
+                            className="text-primary hover:text-primary hover:bg-primary/10 rounded-full"
                           >
                             <Pencil className="h-5 w-5" />
                           </Button>
@@ -344,7 +342,7 @@ const AdminDashboard = ({ currentTab, onTabChange, onExit }: AdminDashboardProps
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDelete(m.id)}
-                            className="text-destructive hover:text-destructive"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
                           >
                             <Trash2 className="h-5 w-5" />
                           </Button>
@@ -360,32 +358,32 @@ const AdminDashboard = ({ currentTab, onTabChange, onExit }: AdminDashboardProps
 
         {currentTab === "admin" && (
           <>
-            <Card className="shadow-lg">
+            <Card className="shadow-lg rounded-3xl border-0 bg-card">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <UserPlus className="h-5 w-5" />
+                  <UserPlus className="h-5 w-5 text-primary" />
                   Invita Nuovo Admin
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Email nuovo admin</Label>
+                  <Label className="text-sm font-medium">Email nuovo admin</Label>
                   <Input
                     type="email"
                     placeholder="email@esempio.com"
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
-                    className="rounded-xl"
+                    className="rounded-2xl py-6"
                     disabled={isSendingInvite}
                   />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Verrà generato un codice OTP a 6 cifre. Il nuovo admin dovrà usare questo codice per verificare l'accesso. La password standard sarà: <strong>admin26</strong>
+                  Verrà inviato un codice OTP a 6 cifre via email. Il nuovo admin dovrà inserirlo per verificare l'accesso. La password standard sarà: <strong>admin26</strong>
                 </p>
                 <Button
                   onClick={handleSendInvite}
                   disabled={isSendingInvite}
-                  className="w-full rounded-xl"
+                  className="w-full rounded-2xl py-6 font-medium"
                 >
                   <Send className="h-4 w-4 mr-2" />
                   {isSendingInvite ? "Invio in corso..." : "Invia Invito"}
@@ -393,31 +391,41 @@ const AdminDashboard = ({ currentTab, onTabChange, onExit }: AdminDashboardProps
               </CardContent>
             </Card>
 
-            <Card className="shadow-lg">
+            <Card className="shadow-lg rounded-3xl border-0 bg-card">
               <CardHeader>
-                <CardTitle className="text-lg">
-                  Admin Autorizzati 👤
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
+                  Admin Autorizzati
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground mb-4">
-                  Gestione amministratori e impostazioni avanzate.
-                </p>
                 <ul className="space-y-2">
-                  <li className="flex items-center gap-2 p-2 bg-primary/10 rounded-lg">
-                    <span className="w-2 h-2 bg-primary rounded-full" />
-                    <span className="text-primary font-medium">lucafinaldi3@gmail.com</span>
-                    <span className="text-xs text-muted-foreground ml-auto">(fisso)</span>
+                  <li className="flex items-center gap-3 p-3 bg-primary/5 rounded-2xl">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Shield className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <span className="font-medium">lucafinaldi3@gmail.com</span>
+                      <p className="text-xs text-muted-foreground">Admin fisso</p>
+                    </div>
                   </li>
-                  <li className="flex items-center gap-2 p-2 bg-primary/10 rounded-lg">
-                    <span className="w-2 h-2 bg-primary rounded-full" />
-                    <span className="text-primary font-medium">matviso03@gmail.com</span>
-                    <span className="text-xs text-muted-foreground ml-auto">(fisso)</span>
+                  <li className="flex items-center gap-3 p-3 bg-primary/5 rounded-2xl">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Shield className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <span className="font-medium">matviso03@gmail.com</span>
+                      <p className="text-xs text-muted-foreground">Admin fisso</p>
+                    </div>
                   </li>
-                  <li className="flex items-center gap-2 p-2 bg-primary/10 rounded-lg">
-                    <span className="w-2 h-2 bg-primary rounded-full" />
-                    <span className="text-primary font-medium">Venturi2005@libero.it</span>
-                    <span className="text-xs text-muted-foreground ml-auto">(fisso)</span>
+                  <li className="flex items-center gap-3 p-3 bg-primary/5 rounded-2xl">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Shield className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <span className="font-medium">Venturi2005@libero.it</span>
+                      <p className="text-xs text-muted-foreground">Admin fisso</p>
+                    </div>
                   </li>
                 </ul>
               </CardContent>
@@ -426,70 +434,75 @@ const AdminDashboard = ({ currentTab, onTabChange, onExit }: AdminDashboardProps
         )}
       </main>
 
-      {/* Bottom tabs */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border">
+      {/* Bottom tabs - iOS style */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-card/80 backdrop-blur-lg border-t border-border safe-area-pb">
         <div className="flex">
           <button
             onClick={() => onTabChange("admin")}
-            className={`flex-1 py-4 text-center font-medium transition-colors ${
+            className={`flex-1 py-4 flex flex-col items-center gap-1 transition-colors ${
               currentTab === "admin"
                 ? "text-primary"
                 : "text-muted-foreground"
             }`}
           >
-            Admin
+            <Users className="h-5 w-5" />
+            <span className="text-xs font-medium">Admin</span>
           </button>
           <button
             onClick={() => onTabChange("macchine")}
-            className={`flex-1 py-4 text-center font-medium transition-colors ${
+            className={`flex-1 py-4 flex flex-col items-center gap-1 transition-colors ${
               currentTab === "macchine"
                 ? "text-primary"
                 : "text-muted-foreground"
             }`}
           >
-            Macchine
+            <Package className="h-5 w-5" />
+            <span className="text-xs font-medium">Macchine</span>
           </button>
         </div>
       </nav>
 
       {/* Edit Product Dialog */}
       <Dialog open={!!editingProduct} onOpenChange={() => setEditingProduct(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md rounded-3xl">
           <DialogHeader>
-            <DialogTitle>Modifica Macchinario</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-primary" />
+              Modifica Macchinario
+            </DialogTitle>
           </DialogHeader>
           {editingProduct && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Immagine</Label>
+                <Label className="text-sm font-medium">Immagine</Label>
                 <input
                   type="file"
                   accept="image/*"
                   onChange={handleEditFileChange}
-                  className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                  className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-2xl file:border-0 file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
                   disabled={isUploading}
                 />
                 {editImagePreview && (
                   <img
                     src={editImagePreview}
                     alt="Preview"
-                    className="w-full h-32 object-cover rounded-xl"
+                    className="w-full h-32 object-cover rounded-2xl"
                   />
                 )}
               </div>
               
               <div className="space-y-2">
-                <Label>Nome *</Label>
+                <Label className="text-sm font-medium">Nome *</Label>
                 <Input
                   value={editingProduct.nome}
                   onChange={(e) => setEditingProduct({ ...editingProduct, nome: e.target.value })}
-                  className="rounded-xl"
+                  className="rounded-2xl"
                   disabled={isUploading}
                 />
               </div>
               
               <div className="space-y-2">
-                <Label>Prezzo (€)</Label>
+                <Label className="text-sm font-medium">Prezzo (€)</Label>
                 <Input
                   type="number"
                   value={editingProduct.prezzo || ""}
@@ -497,27 +510,27 @@ const AdminDashboard = ({ currentTab, onTabChange, onExit }: AdminDashboardProps
                     ...editingProduct, 
                     prezzo: e.target.value ? parseFloat(e.target.value) : null 
                   })}
-                  className="rounded-xl"
+                  className="rounded-2xl"
                   disabled={isUploading}
                 />
               </div>
               
               <div className="space-y-2">
-                <Label>Descrizione</Label>
+                <Label className="text-sm font-medium">Descrizione</Label>
                 <Textarea
                   value={editingProduct.descrizione || ""}
                   onChange={(e) => setEditingProduct({ ...editingProduct, descrizione: e.target.value })}
-                  className="rounded-xl min-h-20"
+                  className="rounded-2xl min-h-20"
                   disabled={isUploading}
                 />
               </div>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingProduct(null)}>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditingProduct(null)} className="rounded-2xl">
               Annulla
             </Button>
-            <Button onClick={handleSaveEdit} disabled={isUploading}>
+            <Button onClick={handleSaveEdit} disabled={isUploading} className="rounded-2xl">
               {isUploading ? "Salvataggio..." : "Salva"}
             </Button>
           </DialogFooter>
