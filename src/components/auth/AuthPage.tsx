@@ -40,10 +40,11 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     try {
+      const redirectUrl = window.location.origin;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: 'https://emmegi-web-rebuild.vercel.app/',
+          redirectTo: redirectUrl,
         }
       });
       if (error) {
