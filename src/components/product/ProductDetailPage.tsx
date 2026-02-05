@@ -111,7 +111,7 @@ const ProductDetailPage = ({ product, onBack, onProductClick }: ProductDetailPag
 
             {/* WhatsApp */}
             <a
-              href={`https://wa.me/${companyPhone.replace(/[^0-9]/g, '')}?text=${whatsappMessage}`}
+              href={`https://wa.me/393270573481?text=${whatsappMessage}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex flex-col items-center p-4 bg-card rounded-xl border border-border hover:border-primary transition-colors"
