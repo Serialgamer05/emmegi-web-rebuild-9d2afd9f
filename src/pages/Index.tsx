@@ -108,9 +108,11 @@ const Index = () => {
 
   // Show admin dashboard (only if admin)
   if ((currentPage === "admin" || currentPage === "add-product") && isAdmin) {
+    // Set the correct tab based on the page
+    const tab = currentPage === "admin" ? "admin" : "macchine";
     return (
       <AdminDashboard
-        currentTab={adminTab}
+        currentTab={tab}
         onTabChange={setAdminTab}
         onExit={() => handleNavigate("home")}
       />

@@ -1,4 +1,4 @@
-import { Home, PlusCircle, LogOut, Settings, X, LogIn } from "lucide-react";
+import { Home, LogOut, Settings, X, LogIn, Package, Users, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
@@ -20,11 +20,19 @@ const Sidebar = ({ isOpen, onClose, currentPage, onNavigate, isAdmin = false }: 
   ];
 
   const adminItems = [
-    { id: "add-product", label: "Aggiungi Prodotto", icon: PlusCircle },
+    { id: "gestione-macchinari", label: "Gestione Macchinari", icon: Package },
+    { id: "gestione-admin", label: "Gestione Admin", icon: Users },
   ];
 
   const handleNavigation = (page: string) => {
-    onNavigate(page);
+    // Map the sidebar navigation to the appropriate page/tab
+    if (page === "gestione-macchinari") {
+      onNavigate("add-product");
+    } else if (page === "gestione-admin") {
+      onNavigate("admin");
+    } else {
+      onNavigate(page);
+    }
     onClose();
   };
 
@@ -62,8 +70,8 @@ const Sidebar = ({ isOpen, onClose, currentPage, onNavigate, isAdmin = false }: 
             <p className="font-medium text-sm truncate mt-1">{user.email}</p>
             {isAdmin && (
               <span className="inline-flex items-center gap-1 mt-2 text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-medium">
-                <span className="w-1.5 h-1.5 bg-primary rounded-full" />
-                Admin
+                <Shield className="w-3 h-3" />
+                Modalità Admin
               </span>
             )}
           </div>
@@ -98,7 +106,9 @@ const Sidebar = ({ isOpen, onClose, currentPage, onNavigate, isAdmin = false }: 
               </p>
               {adminItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = currentPage === item.id || currentPage === "admin";
+                const isActive = 
+                  (item.id === "gestione-macchinari" && currentPage === "add-product") ||
+                  (item.id === "gestione-admin" && currentPage === "admin");
                 return (
                   <button
                     key={item.id}

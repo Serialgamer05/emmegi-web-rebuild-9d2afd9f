@@ -52,54 +52,109 @@
      const acceptUrl = `${appUrl}/admin-invite?token=${inviteToken}&email=${encodeURIComponent(email)}&action=accept`;
      const declineUrl = `${appUrl}/admin-invite?token=${inviteToken}&email=${encodeURIComponent(email)}&action=decline`;
  
-     // Send invite email
-     const emailResponse = await fetch("https://api.resend.com/emails", {
-       method: "POST",
-       headers: {
-         "Authorization": `Bearer ${RESEND_API_KEY}`,
-         "Content-Type": "application/json",
-       },
-       body: JSON.stringify({
-         from: "Emmegi S.r.l. <onboarding@resend.dev>",
-         to: [email],
-         subject: "🔐 Invito Admin - Emmegi S.r.l.",
-         html: `
-           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-             <div style="text-align: center; margin-bottom: 30px;">
-               <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border-radius: 20px; display: inline-flex; align-items: center; justify-content: center; color: white; font-size: 36px; font-weight: bold;">E</div>
-             </div>
-             
-             <h1 style="color: #1f2937; text-align: center; font-size: 28px; margin-bottom: 10px;">Ciao!</h1>
-             <p style="color: #6b7280; text-align: center; font-size: 18px; margin-bottom: 30px;">
-               ${inviterName ? `<strong>${inviterName}</strong> ti ha invitato come` : 'Sei stato invitato come'} <span style="color: #3b82f6; font-weight: bold;">Admin</span> su Emmegi S.r.l.
-             </p>
-             
-             <div style="background: #f9fafb; border-radius: 16px; padding: 30px; margin-bottom: 30px; text-align: center;">
-               <p style="color: #4b5563; margin: 0 0 20px 0; font-size: 16px;">Vuoi accettare questo invito?</p>
-               
-               <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
-                 <a href="${acceptUrl}" style="display: inline-block; background: linear-gradient(135deg, #22c55e, #16a34a); color: white; padding: 14px 40px; border-radius: 30px; text-decoration: none; font-weight: 600; font-size: 16px;">
-                   ✓ Sì, accetto
-                 </a>
-                 <a href="${declineUrl}" style="display: inline-block; background: #e5e7eb; color: #6b7280; padding: 14px 40px; border-radius: 30px; text-decoration: none; font-weight: 600; font-size: 16px;">
-                   ✗ No, rifiuto
-                 </a>
-               </div>
-             </div>
-             
-             <div style="background: #eff6ff; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-               <p style="color: #1e40af; margin: 0; font-size: 14px; text-align: center;">
-                 <strong>Nota:</strong> Se accetti, la tua password iniziale sarà: <code style="background: #dbeafe; padding: 2px 8px; border-radius: 4px; font-weight: bold;">admin26</code>
-               </p>
-             </div>
-             
-             <p style="color: #9ca3af; text-align: center; font-size: 12px; margin-top: 30px;">
-               Questo invito scade tra 24 ore. Se non hai richiesto tu questo invito, puoi ignorare questa email.
-             </p>
-           </div>
-         `,
-       }),
-     });
+      // Send invite email with clickable links
+      const emailResponse = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: "Emmegi S.r.l. <onboarding@resend.dev>",
+          to: [email],
+          subject: "🔐 Invito Admin - Emmegi S.r.l.",
+          html: `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 40px 20px;">
+                <tr>
+                  <td align="center">
+                    <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                      <tr>
+                        <td style="padding: 40px 40px 20px 40px; text-align: center;">
+                          <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border-radius: 20px; display: inline-block; line-height: 80px; color: white; font-size: 36px; font-weight: bold;">E</div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 0 40px 10px 40px; text-align: center;">
+                          <h1 style="color: #1f2937; font-size: 28px; margin: 0;">Ciao!</h1>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 0 40px 30px 40px; text-align: center;">
+                          <p style="color: #6b7280; font-size: 18px; margin: 0;">
+                            ${inviterName ? `<strong>${inviterName}</strong> ti ha invitato come` : 'Sei stato invitato come'} <span style="color: #3b82f6; font-weight: bold;">Admin</span> su Emmegi S.r.l.
+                          </p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 0 40px 30px 40px;">
+                          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border-radius: 16px;">
+                            <tr>
+                              <td style="padding: 30px; text-align: center;">
+                                <p style="color: #4b5563; margin: 0 0 20px 0; font-size: 16px;">Vuoi accettare questo invito?</p>
+                                <table cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                                  <tr>
+                                    <td style="padding-right: 10px;">
+                                      <a href="${acceptUrl}" style="display: inline-block; background: linear-gradient(135deg, #22c55e, #16a34a); color: white; padding: 14px 40px; border-radius: 30px; text-decoration: none; font-weight: 600; font-size: 16px;">✓ Sì, accetto</a>
+                                    </td>
+                                    <td style="padding-left: 10px;">
+                                      <a href="${declineUrl}" style="display: inline-block; background: #e5e7eb; color: #6b7280; padding: 14px 40px; border-radius: 30px; text-decoration: none; font-weight: 600; font-size: 16px;">✗ No, rifiuto</a>
+                                    </td>
+                                  </tr>
+                                </table>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 0 40px 20px 40px;">
+                          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #eff6ff; border-radius: 12px;">
+                            <tr>
+                              <td style="padding: 20px; text-align: center;">
+                                <p style="color: #1e40af; margin: 0; font-size: 14px;">
+                                  <strong>Nota:</strong> Se accetti, la tua password iniziale sarà: <code style="background: #dbeafe; padding: 2px 8px; border-radius: 4px; font-weight: bold;">admin26</code>
+                                </p>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 0 40px 20px 40px; text-align: center;">
+                          <p style="color: #6b7280; font-size: 12px; margin: 0;">
+                            Se i bottoni non funzionano, copia e incolla questi link:
+                          </p>
+                          <p style="color: #3b82f6; font-size: 11px; word-break: break-all; margin: 10px 0 5px 0;">
+                            <strong>Accetta:</strong> ${acceptUrl}
+                          </p>
+                          <p style="color: #6b7280; font-size: 11px; word-break: break-all; margin: 0;">
+                            <strong>Rifiuta:</strong> ${declineUrl}
+                          </p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 20px 40px 40px 40px; text-align: center;">
+                          <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+                            Questo invito scade tra 24 ore. Se non hai richiesto tu questo invito, puoi ignorare questa email.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+          `,
+        }),
+      });
  
      const emailResult = await emailResponse.json();
      console.log("Email sent:", emailResult);
