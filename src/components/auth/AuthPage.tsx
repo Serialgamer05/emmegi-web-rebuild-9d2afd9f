@@ -9,7 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import { ArrowLeft, Mail, Lock, Shield, ChevronRight } from "lucide-react";
+import { ArrowLeft, Mail, Lock, Shield, ChevronRight, UserPlus } from "lucide-react";
 
 const emailSchema = z.string().email("Email non valida");
 const passwordSchema = z.string()
@@ -22,11 +22,14 @@ const ADMIN_EMAILS = ["lucafinaldi3@gmail.com", "matviso03@gmail.com", "venturi2
 const MAX_LOGIN_ATTEMPTS = 3;
 const LOCKOUT_STORAGE_KEY = "admin_lockout_";
 
+type AuthStep = "email" | "login" | "register";
+
 interface AuthPageProps {
   onBack?: () => void;
 }
 
 const AuthPage = ({ onBack }: AuthPageProps) => {
+  const [step, setStep] = useState<AuthStep>("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -67,6 +70,57 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
     setIsLockedOut(locked);
   };
 
+  // Check if email exists in the system
+  const handleCheckEmail = async () => {
+    const emailResult = emailSchema.safeParse(email);
+    if (!emailResult.success) {
+      toast({
+        title: "Errore di validazione",
+        description: emailResult.error.issues[0].message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Check if it's a known admin email
+      if (isAdminEmail) {
+        setStep("login");
+        setIsLoading(false);
+        return;
+      }
+
+      // Check if user exists by trying to sign in with wrong password
+      // This will return "Invalid login credentials" if user exists
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.toLowerCase(),
+        password: "dummy_password_check_" + Date.now(),
+      });
+
+      if (error?.message?.includes("Invalid login credentials")) {
+        // User exists, show password login
+        setStep("login");
+      } else if (error?.message?.includes("Email not confirmed")) {
+        // User exists but email not confirmed
+        toast({
+          title: "Email non confermata",
+          description: "Controlla la tua email e conferma la registrazione.",
+          variant: "destructive",
+        });
+        setStep("login");
+      } else {
+        // User doesn't exist, show Google registration
+        setStep("register");
+      }
+    } catch (error) {
+      // On any error, assume user doesn't exist
+      setStep("register");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     try {
@@ -95,33 +149,14 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
     }
   };
 
-  const handleAdminLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check if locked out
-    if (isLockedOut) {
+    // Check if locked out (only for admins)
+    if (isAdminEmail && isLockedOut) {
       toast({
         title: "Account bloccato",
         description: "Troppi tentativi falliti. Accedi con Google o reimposta la password.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    const emailResult = emailSchema.safeParse(email);
-    if (!emailResult.success) {
-      toast({
-        title: "Errore di validazione",
-        description: emailResult.error.issues[0].message,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!isAdminEmail) {
-      toast({
-        title: "Accesso negato",
-        description: "Questo login è riservato agli amministratori. Usa Google per accedere.",
         variant: "destructive",
       });
       return;
@@ -132,26 +167,36 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
     try {
       const { error } = await signIn(email, password);
       if (error) {
-        const newAttempts = loginAttempts + 1;
-        
-        if (newAttempts >= MAX_LOGIN_ATTEMPTS) {
-          updateLockoutStatus(newAttempts, true);
-          toast({
-            title: "Account bloccato",
-            description: "Troppi tentativi falliti. Usa Google per accedere o reimposta la password.",
-            variant: "destructive",
-          });
+        if (isAdminEmail) {
+          const newAttempts = loginAttempts + 1;
+          
+          if (newAttempts >= MAX_LOGIN_ATTEMPTS) {
+            updateLockoutStatus(newAttempts, true);
+            toast({
+              title: "Account bloccato",
+              description: "Troppi tentativi falliti. Usa Google per accedere o reimposta la password.",
+              variant: "destructive",
+            });
+          } else {
+            updateLockoutStatus(newAttempts, false);
+            toast({
+              title: "Credenziali non valide",
+              description: `Email o password errati. Tentativo ${newAttempts}/${MAX_LOGIN_ATTEMPTS}.`,
+              variant: "destructive",
+            });
+          }
         } else {
-          updateLockoutStatus(newAttempts, false);
           toast({
             title: "Credenziali non valide",
-            description: `Email o password errati. Tentativo ${newAttempts}/${MAX_LOGIN_ATTEMPTS}.`,
+            description: "Email o password errati.",
             variant: "destructive",
           });
         }
       } else {
         // Reset lockout on successful login
-        localStorage.removeItem(LOCKOUT_STORAGE_KEY + email.toLowerCase());
+        if (isAdminEmail) {
+          localStorage.removeItem(LOCKOUT_STORAGE_KEY + email.toLowerCase());
+        }
         toast({
           title: "Accesso effettuato",
           description: "Benvenuto su Emmegi S.r.l.!",
@@ -300,6 +345,13 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleBackToEmail = () => {
+    setStep("email");
+    setPassword("");
+    setLoginAttempts(0);
+    setIsLockedOut(false);
   };
 
   // OTP Verification Screen
@@ -502,8 +554,8 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
     );
   }
 
-  // Admin login form - Show lockout screen if locked
-  if (isAdminEmail && isLockedOut) {
+  // Lockout screen for admins
+  if (step === "login" && isAdminEmail && isLockedOut) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <Card className="w-full max-w-md rounded-3xl shadow-xl border-0 bg-card">
@@ -525,22 +577,10 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
               disabled={isLoading}
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                />
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
               </svg>
               <span className="font-medium">{isLoading ? "Caricamento..." : "Continua con Google"}</span>
             </Button>
@@ -571,7 +611,7 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
             <Button
               variant="ghost"
               className="w-full rounded-2xl"
-              onClick={() => setEmail("")}
+              onClick={handleBackToEmail}
               disabled={isLoading}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -594,8 +634,8 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
     );
   }
 
-  // Admin login form - Normal login
-  if (isAdminEmail) {
+  // Login screen (email + password) - for recognized users
+  if (step === "login") {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <Card className="w-full max-w-md rounded-3xl shadow-xl border-0 bg-card">
@@ -603,27 +643,15 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
             <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-lg">
               E
             </div>
-            <h1 className="text-2xl font-semibold tracking-tight">Accesso Admin</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {isAdminEmail ? "Accesso Admin" : "Accedi"}
+            </h1>
             <p className="text-muted-foreground text-sm">
-              Inserisci le tue credenziali
+              Inserisci la tua password per <strong>{email}</strong>
             </p>
           </CardHeader>
           <CardContent className="space-y-6 pt-4">
-            <form onSubmit={handleAdminLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="rounded-2xl pl-12 py-6"
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
+            <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-sm font-medium">Password</Label>
                 <div className="relative">
@@ -636,11 +664,12 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
                     onChange={(e) => setPassword(e.target.value)}
                     className="rounded-2xl pl-12 py-6"
                     disabled={isLoading}
+                    autoFocus
                   />
                 </div>
               </div>
               
-              {loginAttempts > 0 && (
+              {isAdminEmail && loginAttempts > 0 && (
                 <p className="text-sm text-destructive text-center">
                   Tentativi falliti: {loginAttempts}/{MAX_LOGIN_ATTEMPTS}
                 </p>
@@ -649,7 +678,7 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
               <Button
                 type="submit"
                 className="w-full rounded-2xl py-6 font-medium"
-                disabled={isLoading}
+                disabled={isLoading || !password}
               >
                 {isLoading ? "Caricamento..." : "Accedi"}
                 <ChevronRight className="h-5 w-5 ml-2" />
@@ -670,29 +699,17 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
 
             <Separator />
 
-            {/* Google Sign In for Admin */}
+            {/* Google Sign In as alternative */}
             <Button
               className="w-full rounded-2xl py-6 flex items-center justify-center gap-3 bg-card border-2 border-border text-foreground hover:bg-muted"
               onClick={handleGoogleSignIn}
               disabled={isLoading}
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                />
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
               </svg>
               <span className="font-medium">Oppure accedi con Google</span>
             </Button>
@@ -700,11 +717,11 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
             <Button
               variant="ghost"
               className="w-full rounded-2xl"
-              onClick={() => setEmail("")}
+              onClick={handleBackToEmail}
               disabled={isLoading}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Non sei admin? Cambia account
+              Cambia account
             </Button>
 
             {onBack && (
@@ -723,7 +740,71 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
     );
   }
 
-  // Regular user login with Google - iOS style
+  // Registration screen (Google only) - for new users
+  if (step === "register") {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        <Card className="w-full max-w-md rounded-3xl shadow-xl border-0 bg-card">
+          <CardHeader className="text-center space-y-3 pb-2">
+            <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-2xl flex items-center justify-center mx-auto shadow-lg">
+              <UserPlus className="h-8 w-8" />
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight">Registrati</h1>
+            <p className="text-muted-foreground text-sm">
+              L'email <strong>{email}</strong> non è registrata.<br />
+              Registrati con Google per continuare.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-6 pt-4">
+            {/* Google Sign Up */}
+            <Button
+              className="w-full rounded-2xl py-6 flex items-center justify-center gap-3 bg-card border-2 border-border text-foreground hover:bg-muted"
+              onClick={handleGoogleSignIn}
+              disabled={isLoading}
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+              </svg>
+              <span className="font-medium">{isLoading ? "Caricamento..." : "Registrati con Google"}</span>
+            </Button>
+
+            <p className="text-xs text-center text-muted-foreground">
+              Dopo la registrazione riceverai un'email di conferma.<br />
+              Successivamente potrai accedere con email e password.
+            </p>
+
+            <Separator />
+
+            <Button
+              variant="ghost"
+              className="w-full rounded-2xl"
+              onClick={handleBackToEmail}
+              disabled={isLoading}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Torna indietro
+            </Button>
+
+            {onBack && (
+              <Button
+                variant="ghost"
+                className="w-full rounded-2xl text-muted-foreground"
+                onClick={onBack}
+                disabled={isLoading}
+              >
+                Torna alla Home
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Step 1: Email input screen
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       <Card className="w-full max-w-md rounded-3xl shadow-xl border-0 bg-card">
@@ -731,37 +812,40 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
           <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-lg">
             E
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Accedi</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Benvenuto</h1>
           <p className="text-muted-foreground text-sm">
-            Bentornato su Emmegi S.r.l.
+            Inserisci la tua email per continuare
           </p>
         </CardHeader>
         <CardContent className="space-y-6 pt-4">
-          {/* Google Sign In - iOS style */}
+          <div className="space-y-3">
+            <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                id="email"
+                type="email"
+                placeholder="La tua email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="rounded-2xl pl-12 py-6"
+                disabled={isLoading}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleCheckEmail();
+                  }
+                }}
+              />
+            </div>
+          </div>
+
           <Button
-            className="w-full rounded-2xl py-6 flex items-center justify-center gap-3 bg-card border-2 border-border text-foreground hover:bg-muted"
-            onClick={handleGoogleSignIn}
-            disabled={isLoading}
+            className="w-full rounded-2xl py-6 font-medium"
+            onClick={handleCheckEmail}
+            disabled={isLoading || !email}
           >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-              />
-            </svg>
-            <span className="font-medium">{isLoading ? "Caricamento..." : "Continua con Google"}</span>
+            {isLoading ? "Verifica..." : "Continua"}
+            <ChevronRight className="h-5 w-5 ml-2" />
           </Button>
 
           <div className="relative">
@@ -773,23 +857,20 @@ const AuthPage = ({ onBack }: AuthPageProps) => {
             </div>
           </div>
 
-          {/* Admin login hint */}
-          <div className="space-y-3">
-            <p className="text-xs text-center text-muted-foreground">
-              Sei un amministratore? Inserisci la tua email admin
-            </p>
-            <div className="relative">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                type="email"
-                placeholder="Email admin"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="rounded-2xl pl-12 py-6"
-                disabled={isLoading}
-              />
-            </div>
-          </div>
+          {/* Quick Google access */}
+          <Button
+            className="w-full rounded-2xl py-6 flex items-center justify-center gap-3 bg-card border-2 border-border text-foreground hover:bg-muted"
+            onClick={handleGoogleSignIn}
+            disabled={isLoading}
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+            </svg>
+            <span className="font-medium">Accedi con Google</span>
+          </Button>
 
           {onBack && (
             <Button
