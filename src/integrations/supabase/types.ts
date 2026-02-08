@@ -71,6 +71,27 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          email: string
+          id: string
+          role: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          email: string
+          id: string
+          role?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          email?: string
+          id?: string
+          role?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
